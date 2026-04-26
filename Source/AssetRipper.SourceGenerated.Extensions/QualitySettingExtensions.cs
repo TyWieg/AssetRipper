@@ -75,7 +75,7 @@ public static class QualitySettingExtensions
 	public static SkinWeights GetSkinWeights(this IQualitySetting setting)
 	{
 		return (SkinWeights)(setting.Has_SkinWeights() ? setting.SkinWeights : setting.BlendWeights);
-		//todo: merge BlendWeights into SkinWeights in the source generation
+
 	}
 
 	public static TextureQuality GetTextureQuality(this IQualitySetting setting)

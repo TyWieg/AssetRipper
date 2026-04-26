@@ -140,9 +140,6 @@ public sealed class AnimatorControllerProcessor : IAssetProcessor
 
 		animatorControllerLayer.StateMachine.SetAsset(controller.Collection, stateMachine);
 
-#warning TODO: animator
-		//Mask = new();
-
 		animatorControllerLayer.BlendingMode = layer.LayerBlendingMode;
 		animatorControllerLayer.SyncedLayerIndex = layer.StateMachineSynchronizedLayerIndex == 0 ? -1 : (int)layer.StateMachineIndex;
 		animatorControllerLayer.DefaultWeight = layer.DefaultWeight;

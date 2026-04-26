@@ -367,18 +367,7 @@ public readonly record struct VertexDataBlob(
 		};
 	}
 
-	private static byte GetColorDimension(UnityVersion version)
-	{
-		// Todo: Need to check various Unity versions
-		if (version.GreaterThanOrEquals(2018))
-		{
-			return 4;
-		}
-		else
-		{
-			return 1;
-		}
-	}
+	private static byte GetColorDimension(UnityVersion version) => 4;
 
 	private static void Write(EndianWriter writer, Vector2[] vertices)
 	{
