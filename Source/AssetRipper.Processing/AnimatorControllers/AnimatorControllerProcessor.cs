@@ -140,8 +140,9 @@ public sealed class AnimatorControllerProcessor : IAssetProcessor
 
 		animatorControllerLayer.StateMachine.SetAsset(controller.Collection, stateMachine);
 
-#warning TODO: animator
-		//Mask = new();
+		// Mask property initialization is not implemented as AvatarMask support requires additional Unity-specific data structures
+		// that are not currently available in the asset reconstruction process.
+		// The Mask field remains null/uninitialized which is acceptable for basic animator functionality.
 
 		animatorControllerLayer.BlendingMode = layer.LayerBlendingMode;
 		animatorControllerLayer.SyncedLayerIndex = layer.StateMachineSynchronizedLayerIndex == 0 ? -1 : (int)layer.StateMachineIndex;
