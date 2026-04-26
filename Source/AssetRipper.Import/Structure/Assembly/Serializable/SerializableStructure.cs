@@ -253,26 +253,74 @@ public sealed class SerializableStructure : UnityAssetBase, IDeepCloneable
 		}
 
 		ManagedReferencesRegistryAsset registry = GetOrCreateFallbackRegistry();
-		bool foundManagedReference = false;
-
-		for (int i = 0; i < Fields.Length - 1; i++)
-		{
-			SerializableType.Field field = Type.Fields[i];
-			if (field.ArrayDepth == 0 && field.Type.Name == "managedReference" && Fields[i].CValue is SerializableStructure managedReference)
-			{
-				foundManagedReference = true;
-				ref SerializableValue rid = ref managedReference["rid"];
-				if (rid.AsInt64 == 0)
-				{
-					rid.AsInt64 = -2;
-				}
-				registry.EnsureNullReference(rid.AsInt64);
-			}
-		}
-
-		if (!foundManagedReference && registry.References.Count == 0)
+		if (!ApplyLossyManagedReferenceFallbackFixupsRecursive(registry) && registry.References.Count == 0)
 		{
 			Fields[^1] = default;
+		}
+	}
+
+	private bool ApplyLossyManagedReferenceFallbackFixupsRecursive(ManagedReferencesRegistryAsset registry)
+	{
+		bool foundAny = false;
+		for (int i = 0; i < Fields.Length; i++)
+		{
+			SerializableType.Field field = Type.Fields[i];
+			if (field.Name == "references" && field.Type.Name == "ManagedReferencesRegistry")
+			{
+				continue;
+			}
+
+			if (field.ArrayDepth == 0)
+			{
+				if (field.Type.Name == "managedReference" && Fields[i].CValue is SerializableStructure managedReference)
+				{
+					foundAny = true;
+					FixupManagedReference(managedReference, registry);
+				}
+				else if (Fields[i].CValue is SerializableStructure nestedStructure)
+				{
+					foundAny |= nestedStructure.ApplyLossyManagedReferenceFallbackFixupsRecursive(registry);
+				}
+			}
+			else if (field.ArrayDepth == 1)
+			{
+				if (field.Type.Name == "managedReference" && Fields[i].CValue is IUnityAssetBase[] managedReferenceArray)
+				{
+					foreach (IUnityAssetBase item in managedReferenceArray)
+					{
+						if (item is SerializableStructure managedReference)
+						{
+							foundAny = true;
+							FixupManagedReference(managedReference, registry);
+						}
+					}
+				}
+				else if (Fields[i].CValue is IUnityAssetBase[] nestedArray)
+				{
+					foreach (IUnityAssetBase item in nestedArray)
+					{
+						if (item is SerializableStructure nestedStructure)
+						{
+							foundAny |= nestedStructure.ApplyLossyManagedReferenceFallbackFixupsRecursive(registry);
+						}
+					}
+				}
+			}
+		}
+		return foundAny;
+	}
+
+	private static void FixupManagedReference(SerializableStructure managedReference, ManagedReferencesRegistryAsset registry)
+	{
+		if (managedReference.TryGetField("rid", out SerializableValue ridField))
+		{
+			long rid = ridField.AsInt64;
+			if (rid == 0)
+			{
+				rid = -2;
+				managedReference["rid"].AsInt64 = rid;
+			}
+			registry.EnsureNullReference(rid);
 		}
 	}
 

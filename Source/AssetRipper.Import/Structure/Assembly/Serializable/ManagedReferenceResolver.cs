@@ -1,5 +1,6 @@
 using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
+using System.Collections.Concurrent;
 using AssetRipper.Assets.Collections;
 using AssetRipper.IO.Files.SerializedFiles.Parser;
 using AssetRipper.Import.Structure.Assembly.Managers;
@@ -12,48 +13,46 @@ internal sealed class ManagedReferenceResolver
 {
 	public static ManagedReferenceTypeKey TerminusKey { get; } = new("FAKE_ASM", "UnityEngine.DMAT", "Terminus");
 
-	private readonly Dictionary<ManagedReferenceTypeKey, SerializableType?> cache = [];
-	private readonly SerializedTypeReference[] refTypes;
+	private readonly ConcurrentDictionary<ManagedReferenceTypeKey, SerializableType?> cache = new();
+	private readonly Dictionary<ManagedReferenceTypeKey, SerializedTypeReference> refTypes = [];
 	private readonly IAssemblyManager assemblyManager;
 	private readonly UnityVersion version;
-	private readonly Dictionary<ITypeDefOrRef, SerializableType> assemblyTypeCache = new(SignatureComparer.Default);
+	private readonly ConcurrentDictionary<ITypeDefOrRef, SerializableType> assemblyTypeCache = new(SignatureComparer.Default);
 
 	public ManagedReferenceResolver(SerializedAssetCollection? collection, IAssemblyManager assemblyManager, UnityVersion version)
 	{
-		refTypes = collection?.RefTypes ?? [];
+		if (collection?.RefTypes is { } types)
+		{
+			foreach (SerializedTypeReference refType in types)
+			{
+				ManagedReferenceTypeKey key = new(
+					refType.AsmName.String,
+					refType.Namespace.String,
+					refType.ClassName.String);
+				refTypes.TryAdd(key.Normalize(), refType);
+			}
+		}
 		this.assemblyManager = assemblyManager;
 		this.version = version;
 	}
 
 	public SerializableType? Resolve(ManagedReferenceTypeDescriptor descriptor)
 	{
-		ManagedReferenceTypeKey key = descriptor.Key.Normalize();
+		ManagedReferenceTypeKey key = descriptor.Key;
 		if (key.IsEmpty || descriptor.IsTerminus)
 		{
 			return null;
 		}
-		if (cache.TryGetValue(key, out SerializableType? cached))
-		{
-			return cached;
-		}
-
-		SerializableType? resolved = ResolveFromRefTypes(key) ?? ResolveFromAssemblies(key);
-		cache[key] = resolved;
-		return resolved;
+		return cache.GetOrAdd(key, k => ResolveFromRefTypes(k) ?? ResolveFromAssemblies(k));
 	}
 
 	private SerializableType? ResolveFromRefTypes(ManagedReferenceTypeKey key)
 	{
-		foreach (SerializedTypeReference refType in refTypes)
+		if (refTypes.TryGetValue(key, out SerializedTypeReference? refType)
+			&& TypeTreeNodeStruct.TryMakeFromTypeTree(refType.OldType, out TypeTreeNodeStruct rootNode))
 		{
-			if (refType.ClassName.String == key.ClassName
-				&& refType.Namespace.String == key.Namespace
-				&& ManagedReferenceTypeKey.NormalizeAssemblyName(refType.AsmName.String) == key.AssemblyName
-				&& TypeTreeNodeStruct.TryMakeFromTypeTree(refType.OldType, out TypeTreeNodeStruct rootNode))
-			{
-				rootNode = RemoveRegistry(rootNode);
-				return SerializableTreeType.FromRootNode(rootNode).CreateSerializableStructure().Type;
-			}
+			rootNode = RemoveRegistry(rootNode);
+			return SerializableTreeType.FromRootNode(rootNode).CreateSerializableStructure().Type;
 		}
 		return null;
 	}

@@ -9,7 +9,7 @@ internal readonly record struct ManagedReferenceTypeKey(string AssemblyName, str
 
 	public ManagedReferenceTypeKey Normalize()
 	{
-		return new ManagedReferenceTypeKey(NormalizeAssemblyName(AssemblyName), Namespace, ClassName);
+		return new ManagedReferenceTypeKey(NormalizeAssemblyName(AssemblyName), Namespace?.Trim() ?? "", ClassName?.Trim() ?? "");
 	}
 
 	public static string NormalizeAssemblyName(string assemblyName)
@@ -29,9 +29,20 @@ internal readonly record struct ManagedReferenceTypeKey(string AssemblyName, str
 	}
 }
 
-internal sealed record ManagedReferenceTypeDescriptor(string AssemblyName, string Namespace, string ClassName)
+internal sealed record ManagedReferenceTypeDescriptor
 {
-	public ManagedReferenceTypeKey Key => new ManagedReferenceTypeKey(AssemblyName, Namespace, ClassName).Normalize();
+	public ManagedReferenceTypeDescriptor(string assemblyName, string @namespace, string className)
+	{
+		AssemblyName = assemblyName;
+		Namespace = @namespace;
+		ClassName = className;
+		Key = new ManagedReferenceTypeKey(AssemblyName, Namespace, ClassName).Normalize();
+	}
+
+	public string AssemblyName { get; }
+	public string Namespace { get; }
+	public string ClassName { get; }
+	public ManagedReferenceTypeKey Key { get; }
 	public bool IsTerminus => Key == ManagedReferenceResolver.TerminusKey;
 }
 

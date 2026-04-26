@@ -12,6 +12,7 @@ using AssetRipper.IO.Endian;
 using AssetRipper.IO.Files;
 using AssetRipper.IO.Files.SerializedFiles.Parser;
 using AssetRipper.SerializationLogic;
+using System.Runtime.CompilerServices;
 using AssetRipper.SourceGenerated;
 using AssetRipper.SourceGenerated.Classes.ClassID_114;
 using AssetRipper.SourceGenerated.Classes.ClassID_28;
@@ -48,6 +49,7 @@ public sealed class GameAssetFactory : AssetFactoryBase
 	}
 
 	private IAssemblyManager AssemblyManager { get; }
+	private ConditionalWeakTable<AssetCollection, ManagedReferenceResolver> resolverCache = new();
 
 	public override IUnityObjectBase? ReadAsset(AssetInfo assetInfo, ReadOnlyArraySegment<byte> assetData, SerializedType? assetType)
 	{
@@ -60,7 +62,7 @@ public sealed class GameAssetFactory : AssetFactoryBase
 		}
 		else if (assetInfo.ClassID == (int)ClassIDType.MonoBehaviour)
 		{
-			return ReadMonoBehaviour(MonoBehaviour.Create(assetInfo), assetData, AssemblyManager, assetType);
+			return ReadMonoBehaviour(MonoBehaviour.Create(assetInfo), assetData, assetType);
 		}
 		else
 		{
@@ -68,7 +70,7 @@ public sealed class GameAssetFactory : AssetFactoryBase
 		}
 	}
 
-	private static IMonoBehaviour ReadMonoBehaviour(IMonoBehaviour monoBehaviour, ReadOnlyArraySegment<byte> assetData, IAssemblyManager assemblyManager, SerializedType? type)
+	private IMonoBehaviour ReadMonoBehaviour(IMonoBehaviour monoBehaviour, ReadOnlyArraySegment<byte> assetData, SerializedType? type)
 	{
 		EndianSpanReader reader = new EndianSpanReader(assetData, monoBehaviour.Collection.EndianType);
 		try
@@ -78,7 +80,7 @@ public sealed class GameAssetFactory : AssetFactoryBase
 			SerializableStructure? structure;
 			if (type is not null && TypeTreeNodeStruct.TryMakeFromTypeTree(type.OldType, out TypeTreeNodeStruct rootNode))
 			{
-				ManagedReferenceResolver resolver = new(monoBehaviour.Collection as SerializedAssetCollection, assemblyManager, monoBehaviour.Collection.Version);
+				ManagedReferenceResolver resolver = resolverCache.GetValue(monoBehaviour.Collection, collection => new ManagedReferenceResolver(collection as SerializedAssetCollection, AssemblyManager, collection.Version));
 				if ((structure = SerializableTreeType.FromRootNode(rootNode, true).CreateSerializableStructure()).TryRead(ref reader, monoBehaviour, false, resolver, logFailure: false))
 				{
 					monoBehaviour.Structure = structure;
