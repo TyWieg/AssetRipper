@@ -212,7 +212,6 @@ public readonly record struct VertexDataBlob(
 				{
 					if (meshData.HasSkin)
 					{
-						//todo
 
 						//kShaderChannelBlendWeight
 						channels.Add(CreateChannelInfoForFloatVector(0, 12, version));
@@ -367,7 +366,17 @@ public readonly record struct VertexDataBlob(
 		};
 	}
 
-	private static byte GetColorDimension(UnityVersion version) => 4;
+	private static byte GetColorDimension(UnityVersion version)
+	{
+		if (version.GreaterThanOrEquals(2019))
+		{
+			return 4;
+		}
+		else
+		{
+			return 1;
+		}
+	}
 
 	private static void Write(EndianWriter writer, Vector2[] vertices)
 	{

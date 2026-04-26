@@ -121,7 +121,20 @@ public interface IUnityObjectBase : IUnityAssetBase
 		}
 		else
 		{
-			return "Assets/" + ClassName;
+			string collectionName = Collection.Name;
+			if (string.IsNullOrEmpty(collectionName))
+			{
+				return "Assets/" + ClassName;
+			}
+			else
+			{
+				int dotIndex = collectionName.IndexOf('.');
+				if (dotIndex > 0)
+				{
+					collectionName = collectionName.Substring(0, dotIndex);
+				}
+				return $"Assets/{ClassName}/{collectionName}";
+			}
 		}
 	}
 
