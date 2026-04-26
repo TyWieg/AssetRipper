@@ -1,14 +1,14 @@
 const sw = document.getElementById("switch-style"), sw_mobile = document.getElementById("switch-style-m"), b = document.body;
 if (b) {
   function toggleTheme(target, dark) {
-    target.classList.toggle("dark-theme", dark)
-    target.classList.toggle("light-theme", !dark)
+    target.classList.toggle("dark-theme", dark);
+    target.classList.toggle("light-theme", !dark);
   }
 
   function switchEventListener() {
     toggleTheme(b, this.checked);
     if (window.localStorage) {
-      this.checked ? localStorage.setItem("theme", "dark-theme") : localStorage.setItem("theme", "light-theme")
+      this.checked ? localStorage.setItem("theme", "dark-theme") : localStorage.setItem("theme", "light-theme");
     }
   }
 

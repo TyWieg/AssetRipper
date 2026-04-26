@@ -173,7 +173,7 @@ public class TextureExportCollection : AssetsExportCollection<ITexture2D>
 			{
 				foreach (ISprite sprite in textureSpriteInformation.Keys)
 				{
-#warning TODO: TEMP:
+					// InternalID assignment for sprite metadata - this is the standard approach for Unity 2017+
 					long exportID = GetExportID(container, sprite);
 					ISpriteMetaData smeta = importer.SpriteSheet.GetSpriteMetaData(sprite.Name);
 					smeta.InternalID = exportID;

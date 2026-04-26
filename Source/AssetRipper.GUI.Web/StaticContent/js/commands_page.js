@@ -1,4 +1,4 @@
-﻿const { createApp } = Vue
+﻿const { createApp } = Vue;
 
 const app = createApp({
 	data() {
@@ -8,7 +8,7 @@ const app = createApp({
 			export_path: '',
 			export_path_has_files: false,
 			create_subfolder: false
-		}
+		};
 	},
 	methods: {
 		async handleLoadPathChange() {
@@ -104,6 +104,6 @@ const app = createApp({
 			return await response.json();
 		},
 	}
-})
+});
 
-const mountedApp = app.mount('#app')
+const mountedApp = app.mount('#app');

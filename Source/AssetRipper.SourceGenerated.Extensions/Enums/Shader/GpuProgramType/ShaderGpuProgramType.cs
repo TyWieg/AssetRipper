@@ -188,8 +188,6 @@ public static class ShaderGpuProgramTypeExtensions
 						return GPUPlatform.Xbox360;
 					case BuildTarget.XboxOne:
 						return GPUPlatform.XboxOne;
-#warning		 TODO:
-					//return GPUPlatform.xboxone_d3d12;
 
 					case BuildTarget.WiiU:
 						return GPUPlatform.WiiU;

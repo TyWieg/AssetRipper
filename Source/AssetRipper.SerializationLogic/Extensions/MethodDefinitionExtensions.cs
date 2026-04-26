@@ -4,8 +4,7 @@ internal static class MethodDefinitionExtensions
 {
 	public static bool SameAs(this MethodDefinition self, MethodDefinition other)
 	{
-		// FIXME: should be able to compare MethodDefinition references directly
-		return self.FullName == other.FullName;
+		return self.MetadataToken == other.MetadataToken && self.Module == other.Module;
 	}
 
 	public static string PropertyName(this MethodDefinition self)

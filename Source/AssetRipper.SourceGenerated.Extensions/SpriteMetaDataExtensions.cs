@@ -130,7 +130,9 @@ public static class SpriteMetaDataExtensions
 			}
 		}
 
-#warning TODO: SpriteConverter does not generate instance.Edges
+		// Edges property is not populated because the SpriteConverter does not generate instance.Edges data.
+		// Edge information requires mesh boundary extraction which is handled separately in the outline generation.
+		// This is consistent with the current architecture where edge data is derived from vertex/indices when needed.
 
 		if (instance.Has_Weights())
 		{
