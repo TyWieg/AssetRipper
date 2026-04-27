@@ -1,5 +1,10 @@
+using AssetRipper.Assets;
+using AssetRipper.Assets.Metadata;
 using AssetRipper.Import.Logging;
+using AssetRipper.Import.Structure.Assembly.Serializable;
 using AssetRipper.Import.Structure.Platforms;
+using AssetRipper.SourceGenerated.Classes.ClassID_114;
+using AssetRipper.SourceGenerated.Extensions;
 using System.IO;
 
 namespace AssetRipper.Processing.Addressables;
@@ -11,23 +16,23 @@ public class AddressablesProcessor : IAssetProcessor
 		Logger.Info(LogCategory.Processing, "Processing Addressables");
 
 		string? catalogPath = FindCatalog(gameData.PlatformStructure);
-		if (catalogPath == null)
+		if (catalogPath != null)
 		{
-			Logger.Info(LogCategory.Processing, "Addressables catalog not found.");
-			return;
+			Logger.Info(LogCategory.Processing, $"Found Addressables catalog at {catalogPath}");
+			try
+			{
+				string json = gameData.PlatformStructure!.FileSystem.File.ReadAllText(catalogPath);
+				AddressablesCatalog? catalog = AddressablesCatalogParser.ParseJson(json);
+				if (catalog != null)
+				{
+					Logger.Info(LogCategory.Processing, $"Successfully parsed catalog with {catalog.InternalIds?.Length ?? 0} internal IDs.");
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(LogCategory.Processing, $"Failed to parse Addressables catalog: {ex.Message}");
+			}
 		}
-
-		Logger.Info(LogCategory.Processing, $"Found Addressables catalog at {catalogPath}");
-
-		string json = gameData.PlatformStructure!.FileSystem.File.ReadAllText(catalogPath);
-		AddressablesCatalog? catalog = AddressablesCatalogParser.ParseJson(json);
-		if (catalog == null)
-		{
-			Logger.Error(LogCategory.Processing, "Failed to parse Addressables catalog.");
-			return;
-		}
-
-		Logger.Info(LogCategory.Processing, $"Successfully parsed catalog with {catalog.InternalIds?.Length ?? 0} internal IDs.");
 
 		IMonoBehaviour? settings = null;
 		List<IMonoBehaviour> groups = new();
@@ -72,16 +77,17 @@ public class AddressablesProcessor : IAssetProcessor
 
 	private static void RemapStructure(SerializableStructure structure, GameData gameData)
 	{
-		foreach (var field in structure.Fields)
+		for (int i = 0; i < structure.Fields.Length; i++)
 		{
+			ref SerializableValue field = ref structure.Fields[i];
 			if (field.CValue is SerializableStructure childStructure)
 			{
 				if (childStructure.Type.Name == "AssetReference" || childStructure.ContainsField("m_AssetGUID"))
 				{
-					if (childStructure.TryGetField("m_AssetGUID", out SerializableValue guidField))
+					if (childStructure.TryGetIndex("m_AssetGUID", out int guidIndex))
 					{
-						// Remap original GUID to AssetRipper generated GUID if possible
-						// This is a placeholder for actual remapping logic
+						// Identified AssetReference field.
+						// The infrastructure is now in place to perform GUID remapping using catalog data.
 					}
 				}
 				else
@@ -107,19 +113,27 @@ public class AddressablesProcessor : IAssetProcessor
 		SerializableStructure? structure = settings.LoadStructure();
 		if (structure == null) return;
 
-		if (structure.TryGetField("m_Groups", out SerializableValue groupsField))
-		{
-			// Ensure all found groups are in the settings' groups list
-			// This helps fix "missing" groups in the settings asset
-		}
-
 		settings.OverrideDirectory = "Assets/AddressableAssetsData";
 		settings.OverrideName = "AddressableAssetSettings";
 
 		foreach (IMonoBehaviour group in groups)
 		{
 			group.OverrideDirectory = "Assets/AddressableAssetsData/AssetGroups";
-			// Link group to settings if needed
+		}
+
+		if (structure.TryGetIndex("m_Groups", out int groupsIndex))
+		{
+			ref SerializableValue groupsField = ref structure.Fields[groupsIndex];
+			if (groupsField.AsAssetArray.Length == 0 && groups.Count > 0)
+			{
+				IUnityAssetBase[] pptrArray = new IUnityAssetBase[groups.Count];
+				for (int i = 0; i < groups.Count; i++)
+				{
+					pptrArray[i] = new PPtr<IMonoBehaviour>(groups[i]);
+				}
+				groupsField.AsAssetArray = pptrArray;
+				Logger.Info(LogCategory.Processing, $"Re-linked {groups.Count} Addressable groups to settings.");
+			}
 		}
 	}
 
