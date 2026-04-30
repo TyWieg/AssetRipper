@@ -127,6 +127,8 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 			"unity.timeline" => "Unity.Timeline",
 			"unity.postprocessing.runtime" => "Unity.Postprocessing.Runtime",
 			"unity.recorder" => "Unity.Recorder",
+			"unity.localization" => "Unity.Localization",
+			"unity.newtonsoft.json" => "Newtonsoft.Json",
 			"assembly - csharp" => "Assembly-CSharp",
 			"assembly - csharp - firstpass" => "Assembly-CSharp-firstpass",
 			"assembly - csharp - editor" => "Assembly-CSharp-Editor",
@@ -1022,7 +1024,7 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 						"*.physicMaterial", "*.physicsMaterial2D", "*.font", "*.vfx", "*.spriteatlas",
 						"*.inputactions", "*.spriteatlasv2", "*.computeShader",
 						"*.shadergraph", "*.subgraph", "*.visualelements", "*.uss",
-						"*.uxml", "*.razor"
+						"*.uxml", "*.razor", "*.preset", "*.spriteLib"
 					};
 				}
 
@@ -1090,6 +1092,8 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 						case "unity.timeline": return "Unity.Timeline";
 						case "unity.postprocessing.runtime": return "Unity.Postprocessing.Runtime";
 						case "unity.recorder": return "Unity.Recorder";
+						case "unity.localization": return "Unity.Localization";
+						case "unity.newtonsoft.json": return "Newtonsoft.Json";
 						case "assembly - csharp": return "Assembly-CSharp";
 						case "assembly - csharp - firstpass": return "Assembly-CSharp-firstpass";
 						case "assembly - csharp - editor": return "Assembly-CSharp-Editor";
