@@ -129,6 +129,11 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 			"unity.recorder" => "Unity.Recorder",
 			"unity.localization" => "Unity.Localization",
 			"unity.newtonsoft.json" => "Newtonsoft.Json",
+			"unity.services.core" => "Unity.Services.Core",
+			"unity.visualscripting.flow" => "Unity.VisualScripting.Flow",
+			"unity.visualscripting.state" => "Unity.VisualScripting.State",
+			"unity.collections" => "Unity.Collections",
+			"unity.entities" => "Unity.Entities",
 			"assembly - csharp" => "Assembly-CSharp",
 			"assembly - csharp - firstpass" => "Assembly-CSharp-firstpass",
 			"assembly - csharp - editor" => "Assembly-CSharp-Editor",
@@ -216,8 +221,14 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 				{
 					if (EditorUtility.DisplayDialog("Force Sync GUIDs", "This will overwrite the GUIDs in your existing .meta files to match the AssetRipper map. This cannot be easily undone. Continue?", "Yes", "Cancel"))
 					{
-						ForceSyncMetaFiles(true);
+						ForceSyncMetaFiles(true, false);
 					}
+				}
+
+				[MenuItem("Tools/AssetRipper/Force Sync GUIDs (Dry Run)")]
+				private static void ForceSyncDryRunFromMenu()
+				{
+					ForceSyncMetaFiles(true, true);
 				}
 
 				[MenuItem("Tools/AssetRipper/Clean Unresolved References")]
@@ -278,21 +289,27 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 					int changedReferences = 0;
 					HashSet<string> unresolvedIdentities = new HashSet<string>();
 
+					float total = selectedPaths.Length;
+					int unresolvedCount = 0;
 					try
 					{
 						AssetDatabase.StartAssetEditing();
 						for (int i = 0; i < selectedPaths.Length; i++)
 						{
-							if (TryRelinkFile(selectedPaths[i], sourceMap, installedScripts, out int replacements, out int _, out int _, unresolvedIdentities, dryRun))
+							string assetPath = selectedPaths[i];
+							EditorUtility.DisplayProgressBar("Relinking Selected Assets", assetPath, i / total);
+							if (TryRelinkFile(assetPath, sourceMap, installedScripts, out int replacements, out int _, out int unresolved, unresolvedIdentities, dryRun))
 							{
 								changedFiles++;
 								changedReferences += replacements;
 							}
+							unresolvedCount += unresolved;
 						}
 					}
 					finally
 					{
 						AssetDatabase.StopAssetEditing();
+						EditorUtility.ClearProgressBar();
 					}
 
 					if (changedFiles > 0)
@@ -300,6 +317,19 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 						AssetDatabase.Refresh();
 						string action = dryRun ? "Would relink " : "Relinked ";
 						Debug.Log("AssetRipper: " + action + changedReferences + " references in " + changedFiles + " selected assets.");
+					}
+
+					if (unresolvedCount > 0)
+					{
+						StringBuilder sb = new StringBuilder();
+						sb.AppendLine("AssetRipper: " + unresolvedCount + " reference(s) could not be resolved in selection:");
+						List<string> sortedUnresolved = unresolvedIdentities.ToList();
+						sortedUnresolved.Sort(StringComparer.Ordinal);
+						foreach (string identity in sortedUnresolved)
+						{
+							sb.AppendLine("  - " + identity.Replace("|", " / "));
+						}
+						Debug.LogWarning(sb.ToString());
 					}
 					else
 					{
@@ -396,15 +426,15 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 				/// </summary>
 				private static void RecoverMissingMetaFiles(bool verbose)
 				{
-					SyncMetaFiles(verbose, false);
+					SyncMetaFiles(verbose, false, false);
 				}
 
-				private static void ForceSyncMetaFiles(bool verbose)
+				private static void ForceSyncMetaFiles(bool verbose, bool dryRun)
 				{
-					SyncMetaFiles(verbose, true);
+					SyncMetaFiles(verbose, true, dryRun);
 				}
 
-				private static void SyncMetaFiles(bool verbose, bool forceOverwrite)
+				private static void SyncMetaFiles(bool verbose, bool forceOverwrite, bool dryRun)
 				{
 					string mapPath = GetAbsoluteMapPath();
 					if (!File.Exists(mapPath))
@@ -420,10 +450,14 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 					int recovered = 0;
 					int updated = 0;
 					string[] scriptGuids = AssetDatabase.FindAssets("t:MonoScript");
-					foreach (string guid in scriptGuids)
+					float total = scriptGuids.Length;
+					for (int i = 0; i < scriptGuids.Length; i++)
 					{
+						string guid = scriptGuids[i];
 						string assetPath = AssetDatabase.GUIDToAssetPath(guid);
 						if (string.IsNullOrEmpty(assetPath)) continue;
+
+						if (verbose) EditorUtility.DisplayProgressBar("Syncing Meta Files", assetPath, i / total);
 
 						string fullPath = Path.GetFullPath(assetPath);
 						string metaPath = fullPath + ".meta";
@@ -464,9 +498,13 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 							try
 							{
 								string updatedContent = Regex.Replace(metaContent, @"guid:\s*[0-9a-fA-F]{32}", "guid: " + expectedGuid);
-								File.WriteAllText(metaPath, updatedContent);
+								if (!dryRun) File.WriteAllText(metaPath, updatedContent);
 								updated++;
-								if (verbose || VerboseLogging) Debug.Log("AssetRipper: Updated GUID in .meta for " + assetPath + " to " + expectedGuid);
+								if (verbose || VerboseLogging)
+								{
+									string action = dryRun ? "Would update" : "Updated";
+									Debug.Log("AssetRipper: " + action + " GUID in .meta for " + assetPath + " to " + expectedGuid);
+								}
 							}
 							catch (Exception ex)
 							{
@@ -490,9 +528,13 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 									"  userData: \n" +
 									"  assetBundleName: \n" +
 									"  assetBundleVariant: \n";
-								File.WriteAllText(metaPath, metaContent);
+								if (!dryRun) File.WriteAllText(metaPath, metaContent);
 								recovered++;
-								if (verbose || VerboseLogging) Debug.Log("AssetRipper: Recovered .meta file for " + assetPath + " with GUID " + expectedGuid);
+								if (verbose || VerboseLogging)
+								{
+									string action = dryRun ? "Would recover" : "Recovered";
+									Debug.Log("AssetRipper: " + action + " .meta file for " + assetPath + " with GUID " + expectedGuid);
+								}
 							}
 							catch (Exception ex)
 							{
@@ -501,11 +543,15 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 						}
 					}
 
+					EditorUtility.ClearProgressBar();
+
 					if (recovered > 0 || updated > 0)
 					{
-						AssetDatabase.Refresh();
-						if (recovered > 0) Debug.Log("AssetRipper: Recovered " + recovered.ToString(CultureInfo.InvariantCulture) + " missing .meta file(s).");
-						if (updated > 0) Debug.Log("AssetRipper: Updated GUID in " + updated.ToString(CultureInfo.InvariantCulture) + " .meta file(s).");
+						if (!dryRun) AssetDatabase.Refresh();
+						string actionRec = dryRun ? "Would recover " : "Recovered ";
+						string actionUpd = dryRun ? "Would update GUID in " : "Updated GUID in ";
+						if (recovered > 0) Debug.Log("AssetRipper: " + actionRec + recovered.ToString(CultureInfo.InvariantCulture) + " missing .meta file(s).");
+						if (updated > 0) Debug.Log("AssetRipper: " + actionUpd + updated.ToString(CultureInfo.InvariantCulture) + " .meta file(s).");
 					}
 					else if (verbose)
 					{
@@ -594,13 +640,16 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 
 					int cleanedFiles = 0;
 					int cleanedReferences = 0;
+					float total = selectedPaths.Length;
 
 					try
 					{
 						AssetDatabase.StartAssetEditing();
 						for (int i = 0; i < selectedPaths.Length; i++)
 						{
-							if (TryCleanFile(selectedPaths[i], sourceMap, installedScripts, out int count, dryRun))
+							string assetPath = selectedPaths[i];
+							EditorUtility.DisplayProgressBar("Cleaning Selected Assets", assetPath, i / total);
+							if (TryCleanFile(assetPath, sourceMap, installedScripts, out int count, dryRun))
 							{
 								cleanedFiles++;
 								cleanedReferences += count;
@@ -610,6 +659,7 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 					finally
 					{
 						AssetDatabase.StopAssetEditing();
+						EditorUtility.ClearProgressBar();
 					}
 
 					if (cleanedFiles > 0)
@@ -1024,7 +1074,8 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 						"*.physicMaterial", "*.physicsMaterial2D", "*.font", "*.vfx", "*.spriteatlas",
 						"*.inputactions", "*.spriteatlasv2", "*.computeShader",
 						"*.shadergraph", "*.subgraph", "*.visualelements", "*.uss",
-						"*.uxml", "*.razor", "*.preset", "*.spriteLib"
+						"*.uxml", "*.razor", "*.preset", "*.spriteLib",
+						"*.texture2DArray", "*.cubemapArray", "*.addressables"
 					};
 				}
 
@@ -1094,6 +1145,11 @@ public sealed class ScriptReferenceRelinkerPostExporter : IPostExporter
 						case "unity.recorder": return "Unity.Recorder";
 						case "unity.localization": return "Unity.Localization";
 						case "unity.newtonsoft.json": return "Newtonsoft.Json";
+						case "unity.services.core": return "Unity.Services.Core";
+						case "unity.visualscripting.flow": return "Unity.VisualScripting.Flow";
+						case "unity.visualscripting.state": return "Unity.VisualScripting.State";
+						case "unity.collections": return "Unity.Collections";
+						case "unity.entities": return "Unity.Entities";
 						case "assembly - csharp": return "Assembly-CSharp";
 						case "assembly - csharp - firstpass": return "Assembly-CSharp-firstpass";
 						case "assembly - csharp - editor": return "Assembly-CSharp-Editor";
