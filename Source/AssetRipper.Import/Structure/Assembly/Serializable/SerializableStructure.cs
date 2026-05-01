@@ -258,21 +258,53 @@ public sealed class SerializableStructure : UnityAssetBase, IDeepCloneable
 		for (int i = 0; i < Fields.Length - 1; i++)
 		{
 			SerializableType.Field field = Type.Fields[i];
-			if (field.ArrayDepth == 0 && field.Type.Name == "managedReference" && Fields[i].CValue is SerializableStructure managedReference)
+			if (field.Type.Name == "managedReference")
 			{
-				foundManagedReference = true;
-				ref SerializableValue rid = ref managedReference["rid"];
-				if (rid.AsInt64 == 0)
+				if (field.ArrayDepth == 0 && Fields[i].CValue is SerializableStructure managedReference)
 				{
-					rid.AsInt64 = -2;
+					FixupManagedReference(managedReference, registry, ref foundManagedReference);
 				}
-				registry.EnsureNullReference(rid.AsInt64);
+				else if (field.ArrayDepth == 1 && Fields[i].CValue is IUnityAssetBase[] managedReferences)
+				{
+					foreach (IUnityAssetBase item in managedReferences)
+					{
+						if (item is SerializableStructure mr)
+						{
+							FixupManagedReference(mr, registry, ref foundManagedReference);
+						}
+					}
+				}
 			}
 		}
 
 		if (!foundManagedReference && registry.References.Count == 0)
 		{
 			Fields[^1] = default;
+		}
+	}
+
+	private static void FixupManagedReference(SerializableStructure managedReference, ManagedReferencesRegistryAsset registry, ref bool foundManagedReference)
+	{
+		foundManagedReference = true;
+		if (managedReference.TryGetField("rid", out SerializableValue ridField))
+		{
+			long rid = ridField.AsInt64;
+			if (rid == 0)
+			{
+				rid = -2;
+				managedReference["rid"].AsInt64 = rid;
+			}
+			registry.EnsureNullReference(rid);
+		}
+		else if (managedReference.TryGetField("id", out SerializableValue idField))
+		{
+			long rid = idField.AsInt32;
+			if (rid == 0)
+			{
+				rid = -2;
+				managedReference["id"].AsInt32 = (int)rid;
+			}
+			registry.EnsureNullReference(rid);
 		}
 	}
 
