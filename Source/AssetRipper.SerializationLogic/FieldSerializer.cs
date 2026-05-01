@@ -268,7 +268,6 @@ public readonly partial struct FieldSerializer
 					if (monoType.IsCyclicReference(field.Type))
 					{
 						// Infinite recursion disqualifies a field from serialization.
-						fields.Add(field);
 					}
 					else if (!field.Type.IsMaxDepthKnown)
 					{
@@ -293,7 +292,6 @@ public readonly partial struct FieldSerializer
 								type2.AddCyclicReference(type1);
 							}
 						}
-						fields.Add(field);
 					}
 					else
 					{

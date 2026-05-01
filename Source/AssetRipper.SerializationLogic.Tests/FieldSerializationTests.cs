@@ -409,4 +409,38 @@ public class FieldSerializationTests
 		SerializableType serializableType = SerializableTypes.Create<DerivedClassWithSerializableAttribute>();
 		Assert.That(serializableType.Fields, Has.Count.EqualTo(2));
 	}
+
+	[Serializable]
+	private class ManagedClass
+	{
+		public int value;
+	}
+
+	private class MonoBehaviourWithSerializeReference : UnityEngine.MonoBehaviour
+	{
+		[UnityEngine.SerializeReference]
+		public ManagedClass? managedField;
+	}
+
+	[Test]
+	public void SerializeReferenceFieldsAreCorrectlyHandled()
+	{
+		TypeDefinition typeDefinition = ReferenceAssemblies.GetType<MonoBehaviourWithSerializeReference>();
+		FieldSerializer serializer = new(new UnityVersion(2020));
+		Dictionary<ITypeDefOrRef, SerializableType> typeCache = new(SignatureComparer.Default);
+		bool success = serializer.TryCreateSerializableTypeForMonoBehaviour(typeDefinition, typeCache, out SerializableType? serializableType, out string? failureReason);
+
+		Assert.That(success, Is.True, failureReason);
+		Assert.That(serializableType!.Fields, Has.Count.EqualTo(2));
+
+		SerializableType.Field field1 = serializableType.Fields[0];
+		Assert.That(field1.Name, Is.EqualTo("managedField"));
+		Assert.That(field1.Type.Name, Is.EqualTo("managedReference"));
+		Assert.That(field1.Type.Fields, Has.Count.EqualTo(1));
+		Assert.That(field1.Type.Fields[0].Name, Is.EqualTo("rid"));
+
+		SerializableType.Field field2 = serializableType.Fields[1];
+		Assert.That(field2.Name, Is.EqualTo("references"));
+		Assert.That(field2.Type.Name, Is.EqualTo("ManagedReferencesRegistry"));
+	}
 }
